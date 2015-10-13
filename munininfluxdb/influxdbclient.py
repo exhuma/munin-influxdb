@@ -3,7 +3,7 @@ import getpass
 import json
 from collections import defaultdict
 
-import influxdb.influxdb08 as influxdb
+import influxdb as influxdb
 import rrd
 from utils import ProgressBar, parse_handle, Color, Symbol
 from rrd import read_xml_file
@@ -25,19 +25,19 @@ class InfluxdbClient:
                                              self.settings.influxdb['password'])
 
             # dummy request to test connection
-            client.get_database_list()
+            client.get_list_database()
         except influxdb.client.InfluxDBClientError as e:
             self.client, self.valid = None, False
             if not silent:
-                print "  {0} Could not connect to database: {1}".format(Symbol.WARN_YELLOW, e.message)
+                print "  {0} Could not connect to database: {1}".format(Symbol.WARN_YELLOW, str(e))
         except Exception as e:
-            print "Error: ", e.message
+            #print "Error: ", str(e)
             self.client, self.valid = None, False
         else:
             self.client, self.valid = client, True
 
         if self.settings.influxdb['database']:
-            self.client.switch_db(self.settings.influxdb['database'])
+            self.client.switch_database(self.settings.influxdb['database'])
 
         return self.valid
 
@@ -46,7 +46,7 @@ class InfluxdbClient:
         if not name:
             return False
 
-        db_list = self.client.get_database_list()
+        db_list = self.client.get_list_database()
         if not {'name': name} in db_list:
             if self.settings.interactive:
                 create = raw_input("{0} database doesn't exist. Would you want to create it? [y]/n: ".format(name)) or "y"
@@ -56,33 +56,33 @@ class InfluxdbClient:
             try:
                 self.client.create_database(name)
             except influxdb.client.InfluxDBClientError as e:
-                print "Error: could not create database: ", e.message
+                print "Error: could not create database: ", str(e)
                 return False
 
         try:
-            self.client.switch_db(name)
+            self.client.switch_database(name)
         except influxdb.client.InfluxDBClientError as e:
-            print "Error: could not select database: ", e.message
+            print "Error: could not select database: ", str(e)
             return False
 
         # dummy query to test db
         try:
-            res = self.client.query('list series')
+            res = self.client.query('show series')
         except influxdb.client.InfluxDBClientError as e:
-            print "Error: could not query database: ", e.message
+            print "Error: could not query database: ", str(e)
             return False
 
         return True
 
     def list_db(self):
         assert self.client
-        db_list = self.client.get_database_list()
+        db_list = self.client.get_list_database()
         print "List of existing databases:"
         for db in db_list:
             print "  - {0}".format(db['name'])
 
     def list_series(self):
-        return self.client.get_list_series()
+        return self.client.get_list_database()
 
     def list_columns(self, series="/.*/"):
         """
@@ -146,7 +146,7 @@ class InfluxdbClient:
         try:
             self.client.write_points(body)
         except influxdb.client.InfluxDBClientError as e:
-            raise Exception("Cannot insert in {0} series: {1}".format(dict_values.keys(), e.message))
+            raise Exception("Cannot insert in {0} series: {1}".format(dict_values.keys(), str(e)))
 
 
 
@@ -163,7 +163,7 @@ class InfluxdbClient:
         try:
             self.client.write_points(body)
         except influxdb.client.InfluxDBClientError as e:
-            raise Exception("Cannot insert in {0} series: {1}".format(name, e.message))
+            raise Exception("Cannot insert in {0} series: {1}".format(name, str(e)))
 
 
     def validate_record(self, name, columns):
@@ -185,7 +185,7 @@ class InfluxdbClient:
                     res = self.client.query("select count({0}) from {1}".format(column, name))
                     assert res[0]['points'][0][1] >= 0
                 except influxdb.client.InfluxDBClientError as e:
-                    raise Exception(e.message)
+                    raise Exception(str(e))
                 except Exception as e:
                     raise Exception("Column \"{0}\" doesn't exist. (May happen if original data contains only NaN entries)".format(column))
 
@@ -200,8 +200,8 @@ class InfluxdbClient:
             try:
                 self.upload_single_series(series_name, column_names, packed_values)
             except Exception as e:
-                print e
-                errors.append((Symbol.NOK_RED, e.message))
+                #print e
+                errors.append((Symbol.NOK_RED, repr(e)))
                 return
             finally:
                 progress_bar.update(len(column_names)-1)  # 'time' column ignored
@@ -209,7 +209,7 @@ class InfluxdbClient:
             try:
                 self.validate_record(series_name, column_names)
             except Exception as e:
-                errors.append((Symbol.WARN_YELLOW, "Validation error in {0}: {1}".format(series_name, e.message)))
+                errors.append((Symbol.WARN_YELLOW, "Validation error in {0}: {1}".format(series_name, repr(e))))
             finally:
                 progress_bar.update(len(column_names)-1)  # 'time' column ignored
 
@@ -346,13 +346,13 @@ class InfluxdbClient:
                 pass
                 # self.upload_values(series_name, keys_name, data)
             except Exception as e:
-                errors.append(e.message)
+                errors.append(repr(e))
                 continue
 
             try:
                 self.validate_record(series_name, keys_name)
             except Exception as e:
-                errors.append("Validation error in {0}: {1}".format(series_name, e.message))
+                errors.append("Validation error in {0}: {1}".format(series_name, repr(e)))
 
         if errors:
             print "The following errors were detected while importing:"
