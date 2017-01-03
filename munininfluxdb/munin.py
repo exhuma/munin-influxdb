@@ -29,6 +29,9 @@ def discover_from_datafile(settings):
             host, tail = tail.split(":", 1)
             head, value = tail.split(" ", 1)
             plugin_parts = head.split(".")
+	    print line
+            if len(plugin_parts) < 2:
+                continue
             plugin, field, property = ".".join(plugin_parts[0:-2]), plugin_parts[-2], plugin_parts[-1]
             # plugin name kept to allow running the plugin in fetch command
             plugin_name = plugin_parts[0]
