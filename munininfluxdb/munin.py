@@ -29,6 +29,12 @@ def discover_from_datafile(settings):
             host, tail = tail.split(":", 1)
             head, value = tail.split(" ", 1)
             plugin_parts = head.split(".")
+            # there are some line with head values like port, use_node_name, which not represent a plugin
+            # the should be dismissed, because the will lead to an "list index out of range" error
+
+            if len(plugin_parts) == 1:
+                #print "cannot parse line {0}, skipping it".format(line)
+                continue
             plugin, field, property = ".".join(plugin_parts[0:-2]), plugin_parts[-2], plugin_parts[-1]
             # plugin name kept to allow running the plugin in fetch command
             plugin_name = plugin_parts[0]

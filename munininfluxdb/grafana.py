@@ -87,7 +87,7 @@ class Panel:
         if criticals:
             val = criticals.pop().split(":")
             if val[-1]:
-                self.thresholds["threshold2"] = int(val[-1])
+                self.thresholds["threshold2"] = int(float(str(val[-1])))
             # critical doesn't show up if warning is not set to something
             self.thresholds["threshold1"] = self.thresholds["threshold2"]
 
@@ -287,7 +287,7 @@ class Dashboard:
             filename = self.settings.grafana['filename']
 
         with open(filename, "w") as f:
-            json.dump(self.to_json(self.settings), f)
+            json.dump(self.to_json(self.settings), f,  encoding="ISO-8859-1")
 
     def upload(self):
         api = GrafanaApi(self.settings)
@@ -345,8 +345,11 @@ class GrafanaApi:
     @staticmethod
     def test_host(host):
         # should return "unauthorized"
-        r = requests.get(host.rstrip("/") + "/api/org")
-        return r.status_code == 401
+        try:
+            r = requests.get(host.rstrip("/") + "/api/org")
+            return r.status_code == 401
+        except Exception as e:
+            return False
 
     @staticmethod
     def test_auth(host, auth):
