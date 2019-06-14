@@ -408,11 +408,3 @@ if __name__ == "__main__":
     dashboard = Dashboard.generate_simple("Munin", client.list_columns())
     with open("/tmp/munin-grafana.json", "w") as f:
         json.dump(dashboard.to_json(), f, indent=2, separators=(',', ': '))
-
-
-    # with open("../data/config.json") as f:
-    #     conf = json.load(f)
-    #
-    # dashboard = Dashboard("Munin dashboard")
-    # dashboard.generate(conf)
-    # print(json.dumps(dashboard.to_json(),indent=2, separators=(',', ': ')))

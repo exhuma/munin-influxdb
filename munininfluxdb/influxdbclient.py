@@ -12,6 +12,7 @@ try:
 except (AssertionError, AttributeError) as e:
     raise ImportError("InfluxDB API is too old, please update (e.g: pip install influxdb --upgrade)")
 
+import influxdb as influxdb
 import rrd
 from utils import ProgressBar, parse_handle, Color, Symbol
 from rrd import read_xml_file
@@ -90,7 +91,7 @@ class InfluxdbClient:
             print("  - {0}".format(db['name']))
 
     def list_series(self):
-        return self.client.get_list_series()
+        return self.client.get_list_database()
 
     def list_columns(self, series="/.*/"):
         """
@@ -142,6 +143,34 @@ class InfluxdbClient:
 
         group = raw_input("Group multiple fields of the same plugin in the same time series? [y]/n: ") or "y"
         setup['group_fields'] = group in ("y", "Y")
+
+    def upload_multiple_series(self, dict_values):
+        body = [{"name": series,
+                 "columns": data.keys(),
+                 "points": zip(*data.values())
+                }
+                for series, data in dict_values.items()
+        ]
+
+        try:
+            self.client.write_points(body)
+        except influxdb.client.InfluxDBClientError as e:
+            raise Exception("Cannot insert in {0} series: {1}".format(dict_values.keys(), str(e)))
+
+    def upload_single_series(self, name, columns, points):
+        if len(columns) != len(points[0]):
+            raise Exception("Cannot insert in {0} series: expected {1} columns (contains {2})".format(name, len(columns), len(points)))
+
+        body = [{
+            "name": name,
+            "columns": columns,
+            "points": points,
+        }]
+
+        try:
+            self.client.write_points(body)
+        except influxdb.client.InfluxDBClientError as e:
+            raise Exception("Cannot insert in {0} series: {1}".format(name, str(e)))
 
     def write_series(self, measurement, tags, fields, time_and_values):
         if len(fields) != len(time_and_values[0]):
