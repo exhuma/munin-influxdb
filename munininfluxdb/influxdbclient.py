@@ -30,11 +30,17 @@ class InfluxdbClient:
             client = influxdb.InfluxDBClient(self.settings.influxdb['host'],
                                              self.settings.influxdb['port'],
                                              self.settings.influxdb['user'],
-                                             self.settings.influxdb['password']
+                                             self.settings.influxdb['password'],
+                                             None,
+                                             self.settings.influxdb['ssl'],
+                                             self.settings.influxdb['verify_ssl'],
                                              )
 
             # dummy request to test connection
-            client.get_list_database()
+            # this needs admin privileges, so if we use influxdb connection with authentification
+            # this fails, if selected user is not admin user, so we should use this only, if no user has been defined
+            if self.settings.influxdb['user'] is None:
+                client.get_list_database()
         except influxdb.client.InfluxDBClientError as e:
             self.client, self.valid = None, False
             if not silent:
@@ -45,8 +51,11 @@ class InfluxdbClient:
         else:
             self.client, self.valid = client, True
 
-        if self.settings.influxdb['database']:
-            self.client.switch_database(self.settings.influxdb['database'])
+        # should only run, if client is available
+        if self.client is not None:
+            if self.settings.influxdb['database']:
+                print " try to switch to database {0}".format(self.settings.influxdb['database'])
+                self.client.switch_database(self.settings.influxdb['database'])
 
         return self.valid
 
@@ -129,6 +138,19 @@ class InfluxdbClient:
 
             setup['port'] = raw_input("  - port [{0}]: ".format(setup['port'])) or setup['port']
             setup['user'] = raw_input("  - user [{0}]: ".format(setup['user'])) or setup['user']
+            setup['ssl'] = raw_input("  - SSL usage [{0}]: ".format(setup['ssl'])) or setup['ssl']
+            if setup['ssl'] in ['true', 'True', '1']:
+                setup['ssl'] = True
+                setup['veriy_ssl'] = raw_input("  - SSL certificate verification [{0}]: ".format(setup['verify_ssl'])) or setup['verify_ssl']
+                if setup['verify_ssl'] in ['true', 'True', '1']:
+                    setup['veriy_ssl'] = True
+                else:
+                    setup['veriy_ssl'] = False
+            else:
+                setup['ssl'] = False
+                setup['veriy_ssl'] = False
+
+
             setup['password'] = InfluxdbClient.ask_password()
 
             self.connect()
@@ -137,8 +159,12 @@ class InfluxdbClient:
             if setup['database'] == "?":
                 self.list_db()
             else:
-                if self.test_db(setup['database']):
-                    break
+                if setup['testdb']:
+                    if self.test_db(setup['database']):
+                        break
+                else:
+                    if setup['database'] is not None:
+                        break
             setup['database'] = raw_input("  - database [munin]: ") or "munin"
 
         group = raw_input("Group multiple fields of the same plugin in the same time series? [y]/n: ") or "y"
@@ -289,6 +315,9 @@ class InfluxdbClient:
                         except Exception as e:
                             errors.append((Symbol.WARN_YELLOW, "Could not read file for {0}: {1}".format(field, e)))
                         else:
+                            if len(content) == 0:
+                                errors.append((Symbol.WARN_YELLOW, "Could not read file for {0}: {1}".format(field, e.message)))
+                                continue
                             [values[key].append(value) for key, value in content.items()]
 
                             # keep track of influxdb storage info to allow 'fetch'
