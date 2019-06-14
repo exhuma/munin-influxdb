@@ -1,5 +1,7 @@
 import unittest
 
+from influxdb.client import InfluxDBClientError
+
 from munininfluxdb.influxdbclient import InfluxdbClient
 
 from . import mock
@@ -130,9 +132,58 @@ class TestInfluxDBClient(unittest.TestCase):
         client.client.query.assert_called_with('SELECT * FROM "/.*/" LIMIT 1')
         self.assertEqual(result, expected)
 
-    def test_prompt_setup(self):
-        self.skipTest('Unittesting interactive prompts is a bit hairy. '
-                      'Skipping for now.')
+    @mock.patch('munininfluxdb.influxdbclient.prompt')
+    @mock.patch('munininfluxdb.influxdbclient.ask_password')
+    def test_prompt_setup(self, m_askpw, m_prompt):
+        # --- Prepare & Prime mocks
+        self.mock_settings.influxdb = {
+            'host': 'settings-hostname'
+        }
+        client = InfluxdbClient(self.mock_settings)
+        m_askpw.return_value = 'supersecret'
+        m_prompt.side_effect = [
+            'the-hostname',
+            'the-port',
+            'the-user',
+            'the-database',
+            'the-database',
+            'group-field-value',
+        ]
+        new_settings = {
+            'hello': 'world'
+        }
+        client.test_db = mock.MagicMock()
+        client.test_db.side_effect = [False, True]
+        client.connect = mock.MagicMock()
+
+        def dummy_connect(*args, **kwargs):
+            """
+            Connect is called 4 times with the setup done in this test. The
+            first call returns ``False`` triggering user prompts. These prompts
+            have been primed above using the ``m_prompt`` side effects, so we
+            know what should come out of it.
+            """
+            self.mock_settings.influxdb.update(new_settings)
+            yield False
+            yield True
+            yield True
+            yield True
+
+        client.connect.side_effect = dummy_connect()
+
+        # --- Make the call that should be tested
+        client.prompt_setup()
+
+        # --- Run Assertions
+        m_prompt.assert_has_calls([
+            mock.call('HOST_HANDLE', 'settings-hostname'),
+            mock.call('PORT', 8086),
+            mock.call('USER', None),
+            mock.call('HOST_HANDLE', 'the-hostname'),
+            mock.call('DATABASE', 'munin'),
+            mock.call('GROUP_FIELDS', 'y'),
+        ])
+        self.fail('TODO')  # XXX
 
     def test_write_series(self):
         # TODO The exceptions in this function are not yet tested.

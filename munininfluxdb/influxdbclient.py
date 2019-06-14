@@ -17,6 +17,7 @@ import rrd
 from utils import ProgressBar, parse_handle, Color, Symbol
 from rrd import read_xml_file
 from settings import Settings
+from .cli import prompt, ask_password
 
 
 LOG = logging.getLogger(__name__)
@@ -62,7 +63,7 @@ class InfluxdbClient:
         db_list = self.client.get_list_database()
         if not {'name': name} in db_list:
             if self.settings.interactive:
-                create = raw_input("{0} database doesn't exist. Would you want to create it? [y]/n: ".format(name)) or "y"
+                create = prompt('DB_DOES_NOT_EXIST', name) or "y"
                 if not create in ("y", "Y"):
                     return False
 
@@ -116,7 +117,7 @@ class InfluxdbClient:
         setup = self.settings.influxdb
         print("\n{0}InfluxDB: Please enter your connection information{1}".format(Color.BOLD, Color.CLEAR))
         while not self.client:
-            hostname = raw_input("  - host/handle [{0}]: ".format(setup['host'])) or setup['host']
+            hostname = prompt('HOST_HANDLE', setup['host']) or setup['host']
 
             # I miss pointers and explicit references :(
             setup.update(parse_handle(hostname))
@@ -127,11 +128,11 @@ class InfluxdbClient:
             if self.connect(silent=True):
                 break
 
-            setup['port'] = raw_input("  - port [{0}]: ".format(setup['port'])) or setup['port']
-            setup['user'] = raw_input("  - user [{0}]: ".format(setup['user'])) or setup['user']
-            setup['password'] = InfluxdbClient.ask_password()
+            setup['port'] = prompt('PORT', setup['port']) or setup['port']
+            setup['user'] = prompt('USER', setup['user']) or setup['user']
+            setup['password'] = ask_password()
 
-            self.connect()
+            res = self.connect()
 
         while True:
             if setup['database'] == "?":
@@ -139,9 +140,9 @@ class InfluxdbClient:
             else:
                 if self.test_db(setup['database']):
                     break
-            setup['database'] = raw_input("  - database [munin]: ") or "munin"
+            setup['database'] = prompt('DATABASE', 'munin') or "munin"
 
-        group = raw_input("Group multiple fields of the same plugin in the same time series? [y]/n: ") or "y"
+        group = prompt('GROUP_FIELDS', 'y') or "y"
         setup['group_fields'] = group in ("y", "Y")
 
     def write_series(self, measurement, tags, fields, time_and_values):
@@ -337,7 +338,7 @@ class InfluxdbClient:
                 grouped_files[".".join([series_name, parts[-2]])].append(('value', fullname))
 
         if self.settings.interactive:
-            show = raw_input("Would you like to see the prospective series and columns? y/[n]: ") or "n"
+            show = prompt('SHOW_PROSPECTIVE') or "n"
             if show in ("y", "Y"):
                 for series_name in sorted(grouped_files):
                     print("  - {2}{0}{3}: {1}".format(series_name, [name for name, _ in grouped_files[series_name]], Color.GREEN, Color.CLEAR))
