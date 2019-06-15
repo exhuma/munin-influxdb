@@ -78,9 +78,15 @@ class Settings:
             self.interactive = cli_args.interactive
             self.verbose = cli_args.verbose
 
+            self.rrdexport = cli_args.rrdexport
+
             self.influxdb = parse_handle(cli_args.influxdb)
             self.influxdb.update({
                 "group_fields": cli_args.group_fields,
+            })
+            self.influxdb.update({
+                "testdb": cli_args.testdb,
+                "influximport": cli_args.influximport,
             })
             self.paths = {
                 "munin": cli_args.munin_path,
@@ -89,20 +95,33 @@ class Settings:
                 "www": cli_args.www,
                 "xml": cli_args.xml_temp_path,
             }
+
+            #self.grafana = {
+            #    "create": cli_args.grafana,
+            #    "filename": cli_args.grafana_file,
+            #    "title": cli_args.grafana_title,
+            #    "graph_per_row": cli_args.grafana_cols,
+            #    "tags": cli_args.grafana_tags,
+            #    "show_minmax": cli_args.show_minmax,
+            #}
             self.grafana = {
-                "create": cli_args.grafana,
-                "filename": cli_args.grafana_file,
-                "title": cli_args.grafana_title,
-                "graph_per_row": cli_args.grafana_cols,
-                "tags": cli_args.grafana_tags,
-                "show_minmax": cli_args.show_minmax,
+                "create": True,
+                "filename": "/tmp/munin-influxdb/munin-grafana.json",
+                "title": "Munin Dashboard",
+                "graph_per_row": 2,
+                "tags": "grafana munin",
+                "show_minmax": True,
             }
+
         else:
             self.interactive = True
             self.verbose = 1
+            self.rrdexport = True
 
             self.influxdb = parse_handle("root@localhost:8086/db/munin")
             self.influxdb.update({"group_fields": True})
+            self.influxdb.update({"testdb": True})
+            self.influxdb.update({"influximport": True})
             self.paths = {
                 "munin": Defaults.MUNIN_VAR_FOLDER,
                 "datafile": os.path.join(Defaults.MUNIN_VAR_FOLDER, 'datafile'),

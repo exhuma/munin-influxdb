@@ -63,21 +63,23 @@ def ask_password():
 
 def parse_handle(handle):
     """
-    Parses a connection handle to get it's subparts (user, password, host, port, dbname)
-    @return (user, passwd, host, port, dbname)
+    Parses a connection handle to get it's subparts (user, password, host, port, dbname, ssl)
+    @return (user, passwd, host, port, dbname, ssl)
 
     @example
-        127.0.0.1  -> (None, None, '127.0.0.1', None, None)
-        root@localhost  -> ('root', None, 'localhost', None, None)
-        root:passwd@localhost  -> ('root', 'passwd', 'localhost', None, None)
-        root:passwd@db.example.org:8085  -> ('root', 'passwd', 'db.example.org', '8085', None)
-        root@db.example.org:8085/db/test  -> ('root', None, 'db.example.org', '8085', 'test')
-        localhost:8085/test  -> (None, None, 'localhost', '8085', 'test')
-        root@db.example.org:8085/test  -> ('root', None, 'db.example.org', '8085', 'test')
-        root@db.example.org/test  -> ('root', None, 'db.example.org', None, 'test')
+        127.0.0.1  -> (None, None, '127.0.0.1', None, None, False)
+        root@localhost  -> ('root', None, 'localhost', None, None, False)
+        root:passwd@localhost  -> ('root', 'passwd', 'localhost', None, None, False)
+        root:passwd@db.example.org:8085  -> ('root', 'passwd', 'db.example.org', '8085', None, False)
+        root@db.example.org:8085/db/test  -> ('root', None, 'db.example.org', '8085', 'test', False)
+        localhost:8085/test  -> (None, None, 'localhost', '8085', 'test', False)
+        root@db.example.org:8085/test  -> ('root', None, 'db.example.org', '8085', 'test', False)
+        root@db.example.org/test  -> ('root', None, 'db.example.org', None, 'test', False)
+        https://localhost:8085/test  -> (None, None, 'localhost', '8085', 'test', True)
     """
     e = handle.split('@')
     user = passwd = host = port = dbname = None
+    ssl = False
 
     def parse_dbname(dbname):
         elt = dbname.split("/")
@@ -97,6 +99,9 @@ def parse_handle(handle):
             port, dbname = parse_dbname(elt[1])
         return host, port, dbname
 
+    if handle.startswith('https://'):
+        ssl = True
+
     if len(e) == 2:
         user, passwd = parse_user(e[0])
     host, port, dbname = parse_host(e[-1])
@@ -106,5 +111,7 @@ def parse_handle(handle):
         "password": passwd,
         "host": host,
         "port": port,
-        "database": dbname
+        "database": dbname,
+        "ssl": ssl,
+        "verify_ssl": True
     }
